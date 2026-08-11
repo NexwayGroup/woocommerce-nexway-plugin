@@ -118,7 +118,7 @@ if ( ! class_exists( 'NXP_client' ) ) {
 				'country'            => $args['country'],
 				'locale'             => $args['locale'],
 				'storeId'            => $args['store_id'],
-				'wantedProducts'     => $args['items'],
+				'wantedProducts'     => $args['wantedProducts'],
 				'merchantReference'  => $args['merchant_reference'],
 				'returnUrl'          => $args['return_url'],
 				'externalContext'    => base64_encode( $args['merchant_reference'] ),

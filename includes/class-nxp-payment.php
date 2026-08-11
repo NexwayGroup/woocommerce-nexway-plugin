@@ -106,10 +106,7 @@ if ( ! class_exists( 'NXP_payment' ) ) {
 					), 'error' );
 					return array( 'result' => 'fail', 'redirect' => '' );
 				}
-				$items[] = array(
-					'id'       => $nexway_id,
-					'quantity' => max( 1, (int) $line->get_quantity() ),
-				);
+				$items[] = array( 'id' => $nexway_id );
 			}
 
 			$country = $order->get_billing_country();
@@ -122,7 +119,7 @@ if ( ! class_exists( 'NXP_payment' ) ) {
 				'store_id'           => $this->store_id,
 				'country'            => $country,
 				'locale'             => str_replace( '_', '-', get_locale() ),
-				'items'              => $items,
+				'wantedProducts'     => $items,
 				'merchant_reference' => $order->get_order_key(),
 				'return_url'         => wc_get_account_endpoint_url( 'orders' ),
 			) );
