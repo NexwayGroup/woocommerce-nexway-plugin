@@ -98,9 +98,9 @@ if ( ! class_exists( 'NXP_fulfillment' ) ) {
 				: '';
 
 			if ( $context !== '' ) {
-				$order_key = base64_decode( $context );
-				if ( $order_key ) {
-					$order_id = wc_get_order_id_by_order_key( $order_key );
+				$map = json_decode( base64_decode( $context ), true );
+				if ( is_array( $map ) && ! empty( $map['merchant_reference'] ) ) {
+					$order_id = wc_get_order_id_by_order_key( $map['merchant_reference'] );
 					if ( $order_id ) {
 						return wc_get_order( $order_id );
 					}

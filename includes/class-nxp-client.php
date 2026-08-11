@@ -115,13 +115,11 @@ if ( ! class_exists( 'NXP_client' ) ) {
 			}
 
 			$body = array(
-				'country'            => $args['country'],
-				'locale'             => $args['locale'],
-				'storeId'            => $args['store_id'],
-				'wantedProducts'     => $args['wantedProducts'],
-				'merchantReference'  => $args['merchant_reference'],
-				'returnUrl'          => $args['return_url'],
-				'externalContext'    => base64_encode( $args['merchant_reference'] ),
+				'country'         => $args['country'],
+				'locale'          => $args['locale'],
+				'storeId'         => $args['store_id'],
+				'wantedProducts'  => $args['wantedProducts'],
+				'externalContext' => base64_encode( wp_json_encode( array( 'merchant_reference' => $args['merchant_reference'] ) ) ),
 			);
 
 			$url = $this->base_url . '/cart/carts/public';

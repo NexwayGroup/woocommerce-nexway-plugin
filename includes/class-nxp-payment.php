@@ -121,7 +121,6 @@ if ( ! class_exists( 'NXP_payment' ) ) {
 				'locale'             => str_replace( '_', '-', get_locale() ),
 				'wantedProducts'     => $items,
 				'merchant_reference' => $order->get_order_key(),
-				'return_url'         => wc_get_account_endpoint_url( 'orders' ),
 			) );
 			if ( is_wp_error( $cart_id ) ) {
 				wc_add_notice( NXP_PROCESSOR_NAME . ': ' . $cart_id->get_error_message(), 'error' );
