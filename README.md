@@ -23,20 +23,21 @@ Integrates [Nexway Monetize](https://apidoc.nexway.store) as a WooCommerce payme
 | **Client ID** | OAuth `client_id` from your Nexway account |
 | **Client Secret** | OAuth `client_secret` from your Nexway account |
 | **Realm** | Your Nexway realm identifier |
-| **Customer ID** | Nexway `customerId` used when registering the notification receiver |
 | **Store ID** | UUID of the Nexway store carts are created against |
 | **Default billing country** | ISO country code used when the WC order has no billing country (default: `FR`) |
 | **Allowed currencies** | Currencies for which Nexway is offered at checkout. Leave empty to skip the check |
 | **Fulfillment Basic auth user/password** | Credentials Nexway uses to authenticate to the fulfillment endpoint on this site |
 | **Notification Basic auth user/password** | Credentials Nexway uses to authenticate to the notification webhook on this site |
-| **Notification definition IDs** | Comma-separated list of Nexway notification definition IDs to subscribe to |
 | **Skip processing status** | Move paid orders straight to Completed instead of Processing |
 
-### Registering the notification receiver
+### Webhook and fulfillment URLs
 
-After saving your settings, click **Register with Nexway** on the settings page. This calls the Nexway API to register the notification webhook URL automatically.
+The settings page displays the URLs you need to configure manually in your Nexway merchant account:
 
-The webhook URL is: `https://yoursite.com/wp-json/nexway/v1/notification/`
+| Endpoint | URL |
+|---|---|
+| Notification webhook | `https://yoursite.com/wp-json/nexway/v1/notification/` |
+| Fulfillment | `https://yoursite.com/wp-json/nexway/v1/fulfillment/` |
 
 ## Product mapping
 
@@ -68,9 +69,9 @@ A header row is optional and is detected automatically. The results table shows 
 
 ## Fulfillment
 
-Nexway calls `https://yoursite.com/wp-json/nexway/v1/fulfillment/` per line item when an order needs product delivery. This is a synchronous call — the response must include activation data or an error, and it blocks order completion on the Nexway side.
+Nexway calls the fulfillment endpoint per line item when an order needs product delivery. This is a synchronous call — the response must include activation data or an error, and it blocks order completion on the Nexway side.
 
-Configure the fulfillment endpoint credentials in the gateway settings (**Fulfillment Basic auth user/password**), and point Nexway at the URL above during your merchant onboarding.
+Configure the fulfillment endpoint credentials in the gateway settings (**Fulfillment Basic auth user/password**), and point Nexway at the URL shown on the settings page.
 
 ### Providing activation data
 
@@ -106,7 +107,7 @@ The `$payload` array contains:
   "checkout": {
     "orderId": "nexway-order-uuid",
     "lineItemId": "uuid",
-    "cartExternalContext": "base64-encoded-wc-order-key"
+    "cartExternalContext": "<base64-encoded JSON>"
   },
   "user": {
     "email": "customer@example.com",
@@ -123,7 +124,7 @@ The `$payload` array contains:
 }
 ```
 
-The `cartExternalContext` field (base64-decoded) contains the WC order key, which is used internally to correlate the fulfillment call to a WC order.
+`cartExternalContext` decodes to `{"merchant_reference":"wc_order_key"}` and is used internally to correlate the fulfillment call to a WC order.
 
 ## Hooks
 
