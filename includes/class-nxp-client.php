@@ -122,7 +122,7 @@ if ( ! class_exists( 'NXP_client' ) ) {
 				'externalContext' => base64_encode( wp_json_encode( array( 'merchant_reference' => $args['merchant_reference'] ) ) ),
 			);
 
-			$url = $this->base_url . '/cart/carts/public';
+			$url = $this->base_url . '/carts/public';
 			$response = wp_remote_post( $url, array(
 				'headers' => array(
 					'Content-Type'  => 'application/json',
@@ -176,7 +176,7 @@ if ( ! class_exists( 'NXP_client' ) ) {
 				return new WP_Error( 'nxp_auth', __( 'Nexway authentication failed', 'nexway' ) );
 			}
 
-			$url = $this->base_url . '/cart/carts/' . rawurlencode( $cart_id );
+			$url = $this->base_url . '/carts/' . rawurlencode( $cart_id );
 			$response = wp_remote_get( $url, array(
 				'headers' => array(
 					'Accept'        => 'application/json',
