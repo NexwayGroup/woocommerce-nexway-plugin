@@ -204,54 +204,7 @@ if ( ! class_exists( 'NXP_client' ) ) {
 			return $data;
 		}
 
-		/**
-		 * Register a notification receiver.
-		 */
-		public function register_receiver( $args ) {
-
-			$token = $this->get_access_token();
-			if ( ! $token ) {
-				return new WP_Error( 'nxp_auth', __( 'Nexway authentication failed', 'nexway' ) );
-			}
-
-			$body = array(
-				'customerId'                => $args['customer_id'],
-				'url'                       => $args['url'],
-				'authentication'            => array(
-					'type'     => 'basic',
-					'login'    => $args['basic_user'],
-					'password' => $args['basic_pass'],
-				),
-				'notificationDefinitionIds' => $args['notification_definition_ids'],
-			);
-
-			$url = $this->base_url . '/notification/receivers';
-			$response = wp_remote_post( $url, array(
-				'headers' => array(
-					'Content-Type'  => 'application/json',
-					'Authorization' => 'Bearer ' . $token,
-				),
-				'body'    => wp_json_encode( $body ),
-				'timeout' => 15,
-			) );
-
-			if ( is_wp_error( $response ) ) {
-				$this->log( 'Receiver register transport error: ' . $response->get_error_message() );
-				return $response;
-			}
-
-			$status   = (int) wp_remote_retrieve_response_code( $response );
-			$body_str = wp_remote_retrieve_body( $response );
-			$this->log( sprintf( "POST %s\nResponse %d: %s", $url, $status, $body_str ) );
-
-			if ( $status !== 200 && $status !== 201 ) {
-				return new WP_Error( 'nxp_receiver', sprintf( 'Receiver registration failed (%d)', $status ), $body_str );
-			}
-			$data = json_decode( $body_str, true );
-			return is_array( $data ) ? $data : true;
-		}
-
-		private function log( $message ) {
+private function log( $message ) {
 
 			if ( function_exists( 'wc_get_logger' ) ) {
 				wc_get_logger()->info( $message, array( 'source' => NXP_PROCESSOR_SYSTEM_NAME ) );

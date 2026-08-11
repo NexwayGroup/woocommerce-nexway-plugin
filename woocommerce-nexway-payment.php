@@ -50,11 +50,6 @@ add_action( 'wp_enqueue_scripts', function () {
 add_action( 'admin_enqueue_scripts', function () {
 
 	wp_enqueue_style( 'nxp-admin', NXP_PLUGIN_URL . 'assets/css/admin.css', false, NXP_VERSION, 'all' );
-	wp_enqueue_script( 'nxp-admin', NXP_PLUGIN_URL . 'assets/js/admin.js', array( 'jquery' ), NXP_VERSION, true );
-	wp_localize_script( 'nxp-admin', 'nxp_admin', array(
-		'ajax_url'	=> admin_url( 'admin-ajax.php' ),
-		'nonce'		=> wp_create_nonce( 'nxp_admin' ),
-	) );
 });
 
 // Load API client (used by gateway, admin, and notification receiver).

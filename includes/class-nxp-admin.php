@@ -20,8 +20,6 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 			add_action( 'woocommerce_product_after_variable_attributes', array( $this, 'variation_field' ), 10, 3 );
 			add_action( 'woocommerce_save_product_variation', array( $this, 'save_variation_meta' ), 10, 2 );
 
-			add_action( 'wp_ajax_nxp_register_receiver', array( $this, 'ajax_register_receiver' ) );
-
 			add_action( 'admin_menu', array( $this, 'add_mapping_page' ) );
 		}
 
@@ -73,12 +71,6 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 					'description' => __( 'Your Nexway realm identifier.', 'nexway' ),
 					'desc_tip'    => true,
 				),
-				'customer_id'         => array(
-					'title'       => __( 'Customer ID', 'nexway' ),
-					'type'        => 'text',
-					'description' => __( 'Nexway customerId used when registering the notification receiver.', 'nexway' ),
-					'desc_tip'    => true,
-				),
 				'store_id'            => array(
 					'title'       => __( 'Store ID', 'nexway' ),
 					'type'        => 'text',
@@ -125,22 +117,22 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 					'description' => __( 'Password Nexway will use to authenticate to the notification webhook on this site.', 'nexway' ),
 					'desc_tip'    => true,
 				),
-				'notification_definition_ids' => array(
-					'title'       => __( 'Notification definition IDs', 'nexway' ),
-					'type'        => 'text',
-					'description' => __( 'Comma-separated list of Nexway notification definition IDs to subscribe to (e.g. order-completed, order-paymentFailed).', 'nexway' ),
-					'desc_tip'    => true,
-				),
 				'webhook_info'        => array(
 					'title'       => __( 'Webhook URL', 'nexway' ),
 					'type'        => 'title',
 					'description' => sprintf(
-						/* translators: 1: webhook URL, 2: "Register" button HTML */
-						__( 'Point Nexway at: <code>%1$s</code><br>%2$s', 'nexway' ),
-						esc_url( rest_url( 'nexway/v1/notification/' ) ),
-						'<button type="button" class="button button-secondary" id="nxp-register-receiver">'
-							. esc_html__( 'Register with Nexway', 'nexway' )
-							. '</button> <span id="nxp-register-result"></span>'
+						/* translators: %s: webhook URL */
+						__( 'Configure Nexway to send notifications to: <code>%s</code>', 'nexway' ),
+						esc_url( rest_url( 'nexway/v1/notification/' ) )
+					),
+				),
+				'fulfillment_info'    => array(
+					'title'       => __( 'Fulfillment URL', 'nexway' ),
+					'type'        => 'title',
+					'description' => sprintf(
+						/* translators: %s: fulfillment URL */
+						__( 'Configure Nexway to send fulfillment calls to: <code>%s</code>', 'nexway' ),
+						esc_url( rest_url( 'nexway/v1/fulfillment/' ) )
 					),
 				),
 				'completed_status'    => array(
@@ -362,43 +354,5 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 			return $results;
 		}
 
-		public function ajax_register_receiver() {
-
-			check_ajax_referer( 'nxp_admin', 'nonce' );
-			if ( ! current_user_can( 'manage_woocommerce' ) ) {
-				wp_send_json_error( array( 'message' => __( 'Not allowed', 'nexway' ) ), 403 );
-			}
-
-			$settings = get_option( 'woocommerce_' . NXP_PROCESSOR_ID . '_settings', array() );
-			$base_url = ! empty( $settings['base_url'] ) ? $settings['base_url'] : 'https://api.nexway.store';
-
-			foreach ( array( 'client_id', 'client_secret', 'realm', 'customer_id',
-				'notification_basic_user', 'notification_basic_pass', 'notification_definition_ids' ) as $key ) {
-				if ( empty( $settings[ $key ] ) ) {
-					wp_send_json_error( array( 'message' => sprintf(
-						/* translators: %s: setting key */
-						__( 'Setting "%s" is empty.', 'nexway' ), $key ) ) );
-				}
-			}
-
-			$ids = array_filter( array_map( 'trim', explode( ',', $settings['notification_definition_ids'] ) ) );
-			$client = new NXP_client(
-				$settings['client_id'],
-				$settings['client_secret'],
-				$settings['realm'],
-				$base_url
-			);
-			$result = $client->register_receiver( array(
-				'customer_id'                 => $settings['customer_id'],
-				'url'                         => rest_url( 'nexway/v1/notification/' ),
-				'basic_user'                  => $settings['notification_basic_user'],
-				'basic_pass'                  => $settings['notification_basic_pass'],
-				'notification_definition_ids' => $ids,
-			) );
-			if ( is_wp_error( $result ) ) {
-				wp_send_json_error( array( 'message' => $result->get_error_message() ) );
-			}
-			wp_send_json_success( array( 'message' => __( 'Receiver registered.', 'nexway' ), 'response' => $result ) );
-		}
 	}
 }
