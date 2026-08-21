@@ -33,11 +33,13 @@ if ( ! class_exists( 'NXP_notification' ) ) {
 			$expected_pass = isset( $settings['notification_basic_pass'] ) ? (string) $settings['notification_basic_pass'] : '';
 
 			if ( $expected_user === '' || $expected_pass === '' ) {
+				$this->log( 'Notification auth: no credentials configured in the gateway settings.' );
 				return new WP_Error( 'nxp_no_creds', 'Basic auth not configured', array( 'status' => 500 ) );
 			}
 
-			$user = isset( $_SERVER['PHP_AUTH_USER'] ) ? (string) $_SERVER['PHP_AUTH_USER'] : '';
-			$pass = isset( $_SERVER['PHP_AUTH_PW'] )   ? (string) $_SERVER['PHP_AUTH_PW']   : '';
+			$user   = isset( $_SERVER['PHP_AUTH_USER'] ) ? (string) $_SERVER['PHP_AUTH_USER'] : '';
+			$pass   = isset( $_SERVER['PHP_AUTH_PW'] )   ? (string) $_SERVER['PHP_AUTH_PW']   : '';
+			$source = ( $user !== '' || $pass !== '' ) ? 'PHP_AUTH_*' : 'none';
 
 			// Fallback for servers that don't populate PHP_AUTH_* (e.g. FastCGI without rewrite rules).
 			$header = $request->get_header( 'authorization' );
@@ -45,15 +47,55 @@ if ( ! class_exists( 'NXP_notification' ) ) {
 				$decoded = base64_decode( substr( $header, 6 ) );
 				if ( $decoded && strpos( $decoded, ':' ) !== false ) {
 					list( $user, $pass ) = explode( ':', $decoded, 2 );
+					$source = 'Authorization header';
 				}
 			}
 
 			$user_ok = hash_equals( $expected_user, $user );
 			$pass_ok = hash_equals( $expected_pass, $pass );
 			if ( ! $user_ok || ! $pass_ok ) {
+				$this->log( $this->describe_auth_failure( 'Notification', $source, $header, $user, $pass, $user_ok, $pass_ok ) );
 				return new WP_Error( 'nxp_auth', 'Invalid credentials', array( 'status' => 401 ) );
 			}
 			return true;
+		}
+
+		/**
+		 * Build a diagnostic line for a rejected Basic auth attempt.
+		 *
+		 * Distinguishes "no credentials reached PHP" from "credentials did not
+		 * match", which the 401 response itself cannot express. The password is
+		 * never logged, only its length. The username is stripped of control
+		 * characters because this endpoint is unauthenticated and anyone can put
+		 * arbitrary bytes there.
+		 *
+		 * @param string      $label   Endpoint name for the log line.
+		 * @param string      $source  Where the credentials were read from.
+		 * @param string|null $header  Raw Authorization header, if any.
+		 * @param string      $user    Username received.
+		 * @param string      $pass    Password received.
+		 * @param bool        $user_ok Whether the username matched.
+		 * @param bool        $pass_ok Whether the password matched.
+		 * @return string
+		 */
+		private function describe_auth_failure( $label, $source, $header, $user, $pass, $user_ok, $pass_ok ) {
+
+			$safe_user = substr( preg_replace( '/[^\x20-\x7E]/', '', $user ), 0, 64 );
+
+			return sprintf(
+				'%s auth rejected. Read from: %s. Username: %s (match: %s). Password: %s (match: %s). '
+					. 'Authorization header: %s. $_SERVER keys — PHP_AUTH_USER: %s, HTTP_AUTHORIZATION: %s, REDIRECT_HTTP_AUTHORIZATION: %s.',
+				$label,
+				$source,
+				$safe_user === '' ? '(empty)' : '"' . $safe_user . '"',
+				$user_ok ? 'yes' : 'no',
+				$pass === '' ? '(empty)' : sprintf( '%d chars', strlen( $pass ) ),
+				$pass_ok ? 'yes' : 'no',
+				$header ? 'present' : 'absent',
+				isset( $_SERVER['PHP_AUTH_USER'] ) ? 'set' : 'unset',
+				isset( $_SERVER['HTTP_AUTHORIZATION'] ) ? 'set' : 'unset',
+				isset( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ? 'set' : 'unset'
+			);
 		}
 
 		public function handle( WP_REST_Request $request ) {
