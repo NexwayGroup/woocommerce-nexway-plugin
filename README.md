@@ -52,17 +52,39 @@ Open any product in the WooCommerce product editor. The **Nexway product mapping
 Go to **WooCommerce → Nexway Mapping** and upload a CSV file with two columns:
 
 ```
-woo_id,nexway_id
+woo_ref,nexway_id
 123,2f9bb37b-3558-49f0-bea6-69ab834013de
-456,9a1cc48d-4669-50g1-cfa7-80bc945124ef
+COURSE-ADV-01,9a1cc48d-4669-50g1-cfa7-80bc945124ef
+advanced-course,4b2dd59e-5770-61h2-dgb8-91cd056235fg
 ```
 
-A header row is optional and is detected automatically. The results table shows the outcome for every row — updated or skipped with a reason.
+The first column accepts any of three references, tried in this order:
+
+1. **Numeric product ID** — used as-is.
+2. **SKU** — resolved via `wc_get_product_id_by_sku()`. Variation SKUs work and map to the variation itself, which is what checkout reads for variable products.
+3. **Product slug** — parent products only; variations have no meaningful slug.
+
+A header row is optional and is detected automatically. The results table shows the reference from the file, the product ID it resolved to, and the outcome for every row — updated or skipped with a reason.
 
 ## Checkout flow
 
 1. Customer adds mapped products to the cart and selects Nexway at checkout.
 2. WooCommerce creates an order and redirects the customer to Nexway's hosted checkout.
+
+The cart is created with the order's billing details in the Nexway `endUser` object, so the hosted checkout is prefilled rather than asking the customer for the same information twice:
+
+| WooCommerce field | Nexway `endUser` field |
+|---|---|
+| Billing email | `email` |
+| Billing first name | `firstName` |
+| Billing last name | `lastName` |
+| Billing address line 1 + 2 | `streetAddress` |
+| Billing city | `city` |
+| Billing postcode | `zipCode` |
+| Billing country (or the configured default) | `country` |
+| WordPress locale | `locale` |
+
+Empty fields are omitted. Nexway requires `email`, `locale` and `zipCode` on this object, so the whole object is skipped when the order has no billing email, and a missing postcode is written to the WooCommerce log because Nexway may reject the cart. Use the `nxp_cart_end_user` filter to add or override fields — for example a `phone`, or a `shippingAddress` for physical goods.
 3. The customer completes payment on Nexway's pages.
 4. Nexway displays its own thank-you page and redirects the customer to the WooCommerce account orders page.
 5. Nexway sends a notification to the webhook endpoint, which updates the WC order status.
@@ -131,4 +153,5 @@ The `$payload` array contains:
 | Hook | Type | Description |
 |---|---|---|
 | `nxp_form_fields` | filter | Modify the gateway settings fields |
+| `nxp_cart_end_user` | filter | Modify the end-user details sent with the Nexway cart |
 | `nxp_fulfillment_response` | filter | Provide activation data in response to a Nexway fulfillment call |

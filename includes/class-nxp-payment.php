@@ -113,14 +113,16 @@ if ( ! class_exists( 'NXP_payment' ) ) {
 			if ( ! $country ) {
 				$country = $this->default_country;
 			}
+			$locale = str_replace( '_', '-', get_locale() );
 
 			$client = new NXP_client( $this->client_id, $this->client_secret, $this->realm, $this->base_url );
 			$cart_id = $client->create_public_cart( array(
 				'store_id'           => $this->store_id,
 				'country'            => $country,
-				'locale'             => str_replace( '_', '-', get_locale() ),
+				'locale'             => $locale,
 				'wantedProducts'     => $items,
 				'merchant_reference' => $order->get_order_key(),
+				'end_user'           => $this->build_end_user( $order, $country, $locale ),
 			) );
 			if ( is_wp_error( $cart_id ) ) {
 				wc_add_notice( NXP_PROCESSOR_NAME . ': ' . $cart_id->get_error_message(), 'error' );
@@ -146,6 +148,57 @@ if ( ! class_exists( 'NXP_payment' ) ) {
 				'result'   => 'success',
 				'redirect' => $cart['checkoutUrl'],
 			);
+		}
+
+		/**
+		 * Build the Nexway endUser object from the order's billing details, so the
+		 * hosted checkout is prefilled instead of asking the customer again.
+		 *
+		 * Nexway's EndUserPut schema requires email, locale and zipCode, so the
+		 * object is only sent when the order has a billing email. Empty fields are
+		 * dropped rather than sent as empty strings.
+		 *
+		 * @param WC_Order $order   Order being paid.
+		 * @param string   $country Billing country already resolved for the cart.
+		 * @param string   $locale  Locale already resolved for the cart.
+		 * @return array End-user payload, or an empty array to omit it.
+		 */
+		private function build_end_user( $order, $country, $locale ) {
+
+			$street = trim( $order->get_billing_address_1() . ' ' . $order->get_billing_address_2() );
+
+			$end_user = array(
+				'email'         => $order->get_billing_email(),
+				'firstName'     => $order->get_billing_first_name(),
+				'lastName'      => $order->get_billing_last_name(),
+				'streetAddress' => $street,
+				'city'          => $order->get_billing_city(),
+				'zipCode'       => $order->get_billing_postcode(),
+				'country'       => $country,
+				'locale'        => $locale,
+			);
+			$end_user = array_filter( $end_user, function( $value ) {
+				return is_string( $value ) && $value !== '';
+			} );
+
+			if ( empty( $end_user['email'] ) ) {
+				$this->log( sprintf( 'Order %d has no billing email; omitting endUser from the cart.', $order->get_id() ) );
+				$end_user = array();
+			}
+			elseif ( empty( $end_user['zipCode'] ) ) {
+				$this->log( sprintf(
+					'Order %d has no billing postcode; Nexway requires zipCode on endUser and may reject the cart.',
+					$order->get_id()
+				) );
+			}
+
+			/**
+			 * Filter the end-user details sent with the cart.
+			 *
+			 * @param array    $end_user Payload keyed by Nexway EndUserPut field names.
+			 * @param WC_Order $order    Order being paid.
+			 */
+			return apply_filters( 'nxp_cart_end_user', $end_user, $order );
 		}
 
 		public function needs_processing( $needs_processing, $product, $order_id ) {

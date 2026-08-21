@@ -103,8 +103,8 @@ if ( ! class_exists( 'NXP_client' ) ) {
 		 * Create an anonymous cart. Returns cartId on success, WP_Error on failure.
 		 *
 		 * @param array $args {
-		 *   store_id, country, locale, items (array of {id, quantity}),
-		 *   merchant_reference, return_url
+		 *   store_id, country, locale, wantedProducts (array of {id, quantity}),
+		 *   merchant_reference, end_user (optional, Nexway EndUserPut fields)
 		 * }
 		 */
 		public function create_public_cart( $args ) {
@@ -121,6 +121,10 @@ if ( ! class_exists( 'NXP_client' ) ) {
 				'wantedProducts'  => $args['wantedProducts'],
 				'externalContext' => base64_encode( wp_json_encode( array( 'merchant_reference' => $args['merchant_reference'] ) ) ),
 			);
+
+			if ( ! empty( $args['end_user'] ) && is_array( $args['end_user'] ) ) {
+				$body['endUser'] = $args['end_user'];
+			}
 
 			$url = $this->base_url . '/carts/public';
 			$response = wp_remote_post( $url, array(

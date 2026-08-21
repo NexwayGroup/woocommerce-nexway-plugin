@@ -239,8 +239,8 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 			?>
 			<div class="wrap">
 				<h1><?php esc_html_e( 'Nexway Product Mapping', 'nexway' ); ?></h1>
-				<p><?php esc_html_e( 'Upload a CSV file with two columns: WooCommerce product ID and Nexway product ID. A header row is optional and will be skipped automatically.', 'nexway' ); ?></p>
-				<p><code>woo_id,nexway_id</code></p>
+				<p><?php esc_html_e( 'Upload a CSV file with two columns: a WooCommerce product reference and the Nexway product ID. The reference can be a numeric product ID, a SKU, or a product slug. A header row is optional and will be skipped automatically.', 'nexway' ); ?></p>
+				<p><code>woo_ref,nexway_id</code></p>
 
 				<form method="post" enctype="multipart/form-data">
 					<?php wp_nonce_field( 'nxp_mapping_import', 'nxp_mapping_nonce' ); ?>
@@ -268,6 +268,7 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Row', 'nexway' ); ?></th>
+							<th><?php esc_html_e( 'Reference', 'nexway' ); ?></th>
 							<th><?php esc_html_e( 'WC ID', 'nexway' ); ?></th>
 							<th><?php esc_html_e( 'Nexway ID', 'nexway' ); ?></th>
 							<th><?php esc_html_e( 'Result', 'nexway' ); ?></th>
@@ -277,7 +278,8 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 						<?php foreach ( $results['rows'] as $row ) : ?>
 						<tr>
 							<td><?php echo esc_html( $row['row'] ); ?></td>
-							<td><?php echo esc_html( $row['woo_id'] ); ?></td>
+							<td><?php echo esc_html( $row['woo_ref'] ); ?></td>
+							<td><?php echo esc_html( $row['resolved_id'] ); ?></td>
 							<td><?php echo esc_html( $row['nexway_id'] ); ?></td>
 							<td><?php echo esc_html( $row['result'] ); ?></td>
 						</tr>
@@ -288,6 +290,44 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 				<?php endif; ?>
 			</div>
 			<?php
+		}
+
+		/**
+		 * Resolve a CSV product reference to a WooCommerce product ID.
+		 *
+		 * Accepts a numeric post ID, a product SKU, or a product slug, in that
+		 * order of precedence. Returns 0 when the reference matches nothing.
+		 *
+		 * @param string $reference Raw reference from the CSV.
+		 * @return int Product or variation ID, or 0.
+		 */
+		private function resolve_product_reference( $reference ) {
+
+			if ( $reference === '' ) {
+				return 0;
+			}
+
+			if ( is_numeric( $reference ) ) {
+				return (int) $reference;
+			}
+
+			// SKU: indexed lookup, also matches variations.
+			$by_sku = wc_get_product_id_by_sku( $reference );
+			if ( $by_sku ) {
+				return (int) $by_sku;
+			}
+
+			// Slug: parent products only, variations have no meaningful slug.
+			$by_slug = wc_get_products( array(
+				'slug'   => $reference,
+				'limit'  => 1,
+				'return' => 'ids',
+			) );
+			if ( ! empty( $by_slug ) ) {
+				return (int) $by_slug[0];
+			}
+
+			return 0;
 		}
 
 		private function process_csv_upload( $tmp_path ) {
@@ -308,34 +348,38 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 					continue;
 				}
 
-				$woo_id    = trim( $cols[0] );
+				$woo_ref   = trim( $cols[0] );
 				$nexway_id = trim( $cols[1] );
 
-				// Skip header row.
-				if ( $line_number === 1 && ! is_numeric( $woo_id ) ) {
+				$woo_id = $this->resolve_product_reference( $woo_ref );
+
+				// Skip an optional header row: a non-numeric first cell that
+				// resolves to nothing on line 1 is a column label, not a SKU.
+				if ( $line_number === 1 && ! is_numeric( $woo_ref ) && ! $woo_id ) {
 					continue;
 				}
 
-				if ( ! is_numeric( $woo_id ) || $nexway_id === '' ) {
+				if ( $woo_ref === '' || $nexway_id === '' ) {
 					$results['skipped']++;
 					$results['rows'][] = array(
-						'row'       => $line_number,
-						'woo_id'    => $woo_id,
-						'nexway_id' => $nexway_id,
-						'result'    => __( 'Skipped: invalid data', 'nexway' ),
+						'row'         => $line_number,
+						'woo_ref'     => $woo_ref,
+						'resolved_id' => '',
+						'nexway_id'   => $nexway_id,
+						'result'      => __( 'Skipped: invalid data', 'nexway' ),
 					);
 					continue;
 				}
 
-				$woo_id = (int) $woo_id;
-				$product = wc_get_product( $woo_id );
+				$product = $woo_id ? wc_get_product( $woo_id ) : false;
 				if ( ! $product ) {
 					$results['skipped']++;
 					$results['rows'][] = array(
-						'row'       => $line_number,
-						'woo_id'    => $woo_id,
-						'nexway_id' => $nexway_id,
-						'result'    => __( 'Skipped: product not found', 'nexway' ),
+						'row'         => $line_number,
+						'woo_ref'     => $woo_ref,
+						'resolved_id' => '',
+						'nexway_id'   => $nexway_id,
+						'result'      => __( 'Skipped: product not found', 'nexway' ),
 					);
 					continue;
 				}
@@ -343,10 +387,11 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 				update_post_meta( $woo_id, '_nexway_product_id', sanitize_text_field( $nexway_id ) );
 				$results['updated']++;
 				$results['rows'][] = array(
-					'row'       => $line_number,
-					'woo_id'    => $woo_id,
-					'nexway_id' => $nexway_id,
-					'result'    => __( 'Updated', 'nexway' ),
+					'row'         => $line_number,
+					'woo_ref'     => $woo_ref,
+					'resolved_id' => $woo_id,
+					'nexway_id'   => $nexway_id,
+					'result'      => __( 'Updated', 'nexway' ),
 				);
 			}
 

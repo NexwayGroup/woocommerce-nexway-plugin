@@ -75,9 +75,6 @@ if ( ! class_exists( 'NXP_fulfillment' ) ) {
 			$order = $this->resolve_order( $payload );
 
 			$response = apply_filters( 'nxp_fulfillment_response', array(
-				'activationCode'      => '',
-				'activationLink'      => '',
-				'activationFileContent' => '',
 				'errorCode'           => '',
 				'errorMessage'        => '',
 			), $payload, $order );
