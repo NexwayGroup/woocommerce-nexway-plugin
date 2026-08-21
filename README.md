@@ -1,5 +1,8 @@
 # WooCommerce Nexway Payment
 
+Version 1.0.1 fixes a critical error caused by constructing the payment gateway
+before WordPress had initialized its rewrite system.
+
 Integrates [Nexway Monetize](https://apidoc.nexway.store) as a WooCommerce payment gateway. Customers are redirected to Nexway's hosted checkout, and order state is updated via Nexway's notification webhook.
 
 ## Requirements
@@ -70,8 +73,11 @@ A header row is optional and is detected automatically. The results table shows 
 
 1. Customer adds mapped products to the cart and selects Nexway at checkout.
 2. WooCommerce creates an order and redirects the customer to Nexway's hosted checkout.
+3. The customer completes payment on Nexway's pages.
+4. Nexway displays its own thank-you page and redirects the customer to the WooCommerce account orders page.
+5. Nexway sends a notification to the webhook endpoint, which updates the WC order status.
 
-The cart is created with the order's billing details in the Nexway `endUser` object, so the hosted checkout is prefilled rather than asking the customer for the same information twice:
+Line items are sent with their quantity, and the cart is created with the order's billing details in the Nexway `endUser` object, so the hosted checkout is prefilled rather than asking the customer for the same information twice:
 
 | WooCommerce field | Nexway `endUser` field |
 |---|---|
@@ -85,9 +91,6 @@ The cart is created with the order's billing details in the Nexway `endUser` obj
 | WordPress locale | `locale` |
 
 Empty fields are omitted. Nexway requires `email`, `locale` and `zipCode` on this object, so the whole object is skipped when the order has no billing email, and a missing postcode is written to the WooCommerce log because Nexway may reject the cart. Use the `nxp_cart_end_user` filter to add or override fields — for example a `phone`, or a `shippingAddress` for physical goods.
-3. The customer completes payment on Nexway's pages.
-4. Nexway displays its own thank-you page and redirects the customer to the WooCommerce account orders page.
-5. Nexway sends a notification to the webhook endpoint, which updates the WC order status.
 
 ## Fulfillment
 

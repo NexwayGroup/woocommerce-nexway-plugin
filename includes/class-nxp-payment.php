@@ -23,10 +23,13 @@ if ( ! class_exists( 'NXP_payment' ) ) {
 			$this->id                 = NXP_PROCESSOR_ID;
 			$this->method_title       = NXP_PROCESSOR_NAME;
 			$this->method_description = __( 'Redirect customers to Nexway Monetize hosted checkout.', 'nexway' );
+			$this->has_fields         = false;
+			$this->supports           = array( 'products', 'orders' );
 
 			$this->init_form_fields();
 			$this->init_settings();
 
+			$this->enabled             = $this->get_option( 'enabled', 'no' );
 			$this->title               = $this->get_option( 'title' );
 			$this->description         = $this->get_option( 'description' );
 			$this->client_id           = $this->get_option( 'client_id' );
@@ -38,20 +41,8 @@ if ( ! class_exists( 'NXP_payment' ) ) {
 			$allowed = $this->get_option( 'allowed_currencies' );
 			$this->allowed_currencies  = is_array( $allowed ) ? $allowed : array();
 
-			$this->supports = array( 'products', 'orders' );
-		}
-
-		public function init_actions() {
-
-			add_filter( 'woocommerce_payment_gateways', array( $this, 'add_payment_gateway' ) );
 			add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ), 10 );
 			add_filter( 'woocommerce_order_item_needs_processing', array( $this, 'needs_processing' ), 10, 3 );
-		}
-
-		public function add_payment_gateway( $gateways ) {
-
-			$gateways[] = 'NXP_payment';
-			return $gateways;
 		}
 
 		public function init_form_fields() {
@@ -89,7 +80,7 @@ if ( ! class_exists( 'NXP_payment' ) ) {
 			if ( ! $order ) {
 				$this->log( 'Order ' . $order_id . ' not found in process_payment' );
 				wc_add_notice( __( 'Order not found', 'nexway' ), 'error' );
-				return array( 'result' => 'fail', 'redirect' => '' );
+				return array( 'result' => 'failure', 'redirect' => '' );
 			}
 
 			$items = array();
@@ -104,9 +95,12 @@ if ( ! class_exists( 'NXP_payment' ) ) {
 						__( '"%s" is not available for Nexway payment.', 'nexway' ),
 						$line->get_name()
 					), 'error' );
-					return array( 'result' => 'fail', 'redirect' => '' );
+					return array( 'result' => 'failure', 'redirect' => '' );
 				}
-				$items[] = array( 'id' => $nexway_id );
+				$items[] = array(
+					'id'       => $nexway_id,
+					'quantity' => max( 1, (int) $line->get_quantity() ),
+				);
 			}
 
 			$country = $order->get_billing_country();
@@ -126,19 +120,19 @@ if ( ! class_exists( 'NXP_payment' ) ) {
 			) );
 			if ( is_wp_error( $cart_id ) ) {
 				wc_add_notice( NXP_PROCESSOR_NAME . ': ' . $cart_id->get_error_message(), 'error' );
-				return array( 'result' => 'fail', 'redirect' => '' );
+				return array( 'result' => 'failure', 'redirect' => '' );
 			}
 
 			$cart = $client->get_cart( $cart_id );
 			if ( is_wp_error( $cart ) ) {
 				wc_add_notice( NXP_PROCESSOR_NAME . ': ' . $cart->get_error_message(), 'error' );
-				return array( 'result' => 'fail', 'redirect' => '' );
+				return array( 'result' => 'failure', 'redirect' => '' );
 			}
 
 			if ( empty( $cart['checkoutUrl'] ) ) {
 				$this->log( 'Cart ' . $cart_id . ' has no checkoutUrl in response' );
 				wc_add_notice( __( 'Nexway did not return a checkout URL.', 'nexway' ), 'error' );
-				return array( 'result' => 'fail', 'redirect' => '' );
+				return array( 'result' => 'failure', 'redirect' => '' );
 			}
 
 			$order->update_meta_data( 'nxp_cart_id', $cart_id );

@@ -123,7 +123,7 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 					'description' => sprintf(
 						/* translators: %s: webhook URL */
 						__( 'Configure Nexway to send notifications to: <code>%s</code>', 'nexway' ),
-						esc_url( rest_url( 'nexway/v1/notification/' ) )
+						esc_url( $this->rest_endpoint_url( 'nexway/v1/notification/' ) )
 					),
 				),
 				'fulfillment_info'    => array(
@@ -132,7 +132,7 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 					'description' => sprintf(
 						/* translators: %s: fulfillment URL */
 						__( 'Configure Nexway to send fulfillment calls to: <code>%s</code>', 'nexway' ),
-						esc_url( rest_url( 'nexway/v1/fulfillment/' ) )
+						esc_url( $this->rest_endpoint_url( 'nexway/v1/fulfillment/' ) )
 					),
 				),
 				'completed_status'    => array(
@@ -142,6 +142,28 @@ if ( ! class_exists( 'NXP_admin' ) ) {
 					'default' => 'no',
 				),
 			) );
+		}
+
+		/**
+		 * Build a REST URL safely if another plugin constructs the gateway before
+		 * WordPress has initialized its rewrite object.
+		 *
+		 * @param string $route REST route without the wp-json prefix.
+		 * @return string
+		 */
+		private function rest_endpoint_url( $route ) {
+
+			global $wp_rewrite;
+
+			if ( is_object( $wp_rewrite ) ) {
+				return rest_url( $route );
+			}
+
+			return add_query_arg(
+				'rest_route',
+				'/' . ltrim( $route, '/' ),
+				home_url( '/' )
+			);
 		}
 
 		public function add_product_meta_box() {
